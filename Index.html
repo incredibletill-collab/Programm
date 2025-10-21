@@ -107,6 +107,8 @@ html,body{height:100%;margin:0;background:linear-gradient(180deg,#030409,#071018
 
 <script>
 /* ================= CONFIG ================= */
+  const JUSTWATCH_PROXY_URL = "https://programm-teevau.vercel.app/api/api_proxy";
+
 const START_MIN = 0; // schedule covers full 24 hours (0..1440)
 const END_MIN = 24*60;
 const scheduleKeyPrefix = 'tv_v4_schedule_';
@@ -552,4 +554,5 @@ function todayKey(){ const d = new Date(); return scheduleKeyPrefix + d.getFullY
 </script>
 </body>
 </html>
+
 
