@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mein Streaming TV — v4 (Groß & Smart)</title>
+<style>
+:root{--bg:#04060a;--card:#0f1318;--muted:#9aa6b2;--accent:#e50914}
+*{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,#030409,#071018);color:#e8eef6}
+.app{max-width:1280px;margin:12px auto;padding:14px}
+.header{display:flex;align-items:center;gap:12px}
+.logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#0b1220,#151923);display:flex;align-items:center;justify-content:center;font-weight:800}
+.title{font-size:20px;margin:0}
+.subtitle{color:var(--muted);font-size:13px}
+.controls{margin-left:auto;display:flex;gap:8px}
+.btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:8px;color:inherit;cursor:pointer}
+.btn.primary{background:linear-gradient(90deg,var(--accent),#ff6b6b);border:none;color:white}
+.layout{display:grid;grid-template-columns:1fr 420px;gap:14px;margin-top:14px}
+.panel{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.6)}
+.timeline{display:flex;gap:8px;overflow:auto;padding:8px 4px;border-radius:10px;margin-bottom:12px}
+.timecell{min-width:88px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);text-align:center;font-weight:700}
+.row{margin-bottom:12px}
+.row-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.row-title{font-weight:800}
+.row-scroll{display:flex;gap:10px;overflow:auto;padding-bottom:8px}
+.card{min-width:170px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:8px;border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+.poster{width:160px;height:90px;border-radius:6px;background:#061018;margin-bottom:8px;background-size:cover;background-position:center}
+.meta{display:flex;flex-direction:column;gap:6px}
+.titleSmall{font-weight:700}
+.provider{font-size:12px;color:var(--muted)}
+.small{font-size:13px;color:var(--muted)}
+.footer-note{font-size:12px;color:var(--muted);text-align:center;margin-top:12px}
+
+/* modal */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,12,0.6);z-index:60}
+.modal.open{display:flex}
+.modal-card{width:92%;max-width:980px;background:var(--card);padding:16px;border-radius:12px}
+.modal-top{display:flex;gap:12px}
+.modal-poster{width:220px;height:320px;border-radius:6px;background:#051018;background-size:cover;background-position:center}
+.modal-body{flex:1}
+.modal-title{font-size:18px;font-weight:800}
+.modal-desc{color:var(--muted);margin-top:8px}
+.modal-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}.modal-top{flex-direction:column}.modal-poster{width:100%;height:220px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">TV</div>
+    <div>
+      <h1 class="title">Mein Streaming TV — v4 (Groß & Smart)</h1>
+      <div class="subtitle">24 Stunden • echte Laufzeiten • Blacklist-Block 20:00 • JustWatch-Verfügbarkeit via Vercel</div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="regen">Tagesprogramm neu</button>
+      <button class="btn" id="export">Als Datei speichern</button>
+      <button class="btn primary" id="settingsBtn">Einstellungen</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="panel" id="mainPanel">
+        <div id="timeline" class="timeline"></div>
+        <div id="rows"></div>
+      </div>
+    </div>
+
+    <aside class="aside">
+      <div class="panel">
+        <div class="small">Quellen: Netflix DE · Prime Video DE · Sky Go / WOW · ARD Mediathek · ZDF · ARTE</div>
+        <div style="height:8px"></div>
+        <div class="small">Special: täglich 1 Thema (Murder Monday … Super Sonntag)</div>
+        <div style="height:8px"></div>
+        <div class="small">TMDB Key (für Poster & Laufzeiten):</div>
+        <input id="tmdbKey" placeholder="TMDB Key" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit" />
+        <div style="height:8px"></div>
+        <div class="small">Vercel Proxy URL (optional, z. B. https://your-vercel-app.vercel.app/api/justwatch):</div>
+        <input id="proxyUrl" placeholder="Vercel Proxy URL" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit" />
+        <div style="height:8px"></div>
+        <div class="small">Automatische Neugenerierung: aktiv</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="footer-note">Programm bleibt gleich bis du 'Tagesprogramm neu' klickst. App generiert automatisch täglich um 00:00 ein neues Programm.</div>
+</div>
+
+<!-- modal -->
+<div class="modal" id="modal">
+  <div class="modal-card">
+    <div class="modal-top">
+      <div class="modal-poster" id="modalPoster"></div>
+      <div class="modal-body">
+        <div class="modal-title" id="modalTitle">Titel</div>
+        <div class="small" id="modalMeta">Typ · Anbieter</div>
+        <div class="modal-desc" id="modalDesc">Beschreibung …</div>
+        <div class="modal-actions" id="modalActions"></div>
+      </div>
+    </div>
+    <div style="text-align:right;margin-top:8px"><button class="btn" id="modalClose">Schließen</button></div>
+  </div>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const START_MIN = 0; // schedule covers full 24 hours (0..1440)
+const END_MIN = 24*60;
+const scheduleKeyPrefix = 'tv_v4_schedule_';
+const tmdbStorageKey = 'tv_v4_tmdb_key';
+const proxyStorageKey = 'tv_v4_proxy_url';
+const tmdbPresetKey = ''; // leave empty or prefill with your key if you want
+const usedLimitPerDay = 1; // each title max once per day
+const BLACKLIST_START_MIN = 20*60; // fixed 20:00
+
+/* provider search helpers */
+const providers = {
+  netflix: q => 'https://www.netflix.com/de/search?q=' + encodeURIComponent(q),
+  prime: q => 'https://www.amazon.de/s?k=' + encodeURIComponent(q),
+  sky: q => 'https://www.wowtv.de/suche?query=' + encodeURIComponent(q),
+  ard: q => 'https://www.ardmediathek.de/suche/?q=' + encodeURIComponent(q),
+  zdf: q => 'https://www.zdf.de/suche?q=' + encodeURIComponent(q),
+  arte: q => 'https://www.arte.tv/de/suche/?q=' + encodeURIComponent(q)
+};
+
+/* ================= LARGE INLINED CONTENT POOL ================= */
+/* This pool is intentionally large and diverse. I curated titles that are commonly found
+   on Netflix DE, Prime DE, Sky/WOW, ARD/ZDF/ARTE. You can extend this array in the future. */
+
+const pools = {
+  drama: [
+    "The Blacklist","Das Boot","The Sopranos","Breaking Bad","Better Call Saul","Ozark","Mindhunter","True Detective",
+    "Narcos","Narcos: Mexico","Broadchurch","The Crown","Fargo","Gomorrah","Peaky Blinders","Homeland","Line of Duty",
+    "Sons of Anarchy","Dark","Babylon Berlin","Marcella","The Night Of","Borgen","Unorthodox","Trapped","Killing Eve",
+    "Bosch","Jack Ryan","The Americans","Hannibal","The Wire","The Shield","Luther","River","Top of the Lake","The Fall",
+    "Miss Sherlock","Giri/Haji","ZeroZeroZero","The Bureau","Money Heist","Lupin","The Outsider","The Undoing","Sharp Objects",
+    "Mr. Robot","Power","Boardwalk Empire","Ray Donovan","Succession","Billions"
+  ],
+  klassiker: [
+    "Der Pate","Der Pate II","Der Pate III","Scarface","Pulp Fiction","Spiel mir das Lied vom Tod","Heat","Goodfellas",
+    "Taxi Driver","Casablanca","Citizen Kane","Apocalypse Now","Chinatown","Once Upon a Time in America","The Graduate",
+    "Vertigo","Raging Bull","The Deer Hunter","The Third Man","Bonnie and Clyde","A Clockwork Orange","Reservoir Dogs",
+    "The Bridge on the River Kwai","Dr. Strangelove","Blade Runner","Sunset Blvd","2001: A Space Odyssey","Lawrence of Arabia",
+    "Gone with the Wind","The Last Picture Show","On the Waterfront"
+  ],
+  comedy: [
+    "Family Guy","South Park","Futurama","BoJack Horseman","How I Met Your Mother","The Office (US)","Arrested Development",
+    "Brooklyn Nine-Nine","Parks and Recreation","Seinfeld","Curb Your Enthusiasm","The Simpsons","Rick and Morty",
+    "American Dad","The IT Crowd","30 Rock","Community","The Marvelous Mrs. Maisel","Monty Python's Flying Circus",
+    "The Naked Gun","This Is the End","The Boys","It's Always Sunny in Philadelphia","Superbad","Hot Fuzz","Anchorman",
+    "Ted","The Good Place","Fleabag","Schitt's Creek","Brooklyn","The Big Lebowski"
+  ],
+  doku: [
+    "Terra X","Die Deutschen","Planet Earth","Blue Planet","Our Planet","ZDF History","BBC Horizon","Cosmos",
+    "The Last Dance","Making a Murderer","Inside Job","The Keepers","Ken Burns: The Civil War","The Vietnam War",
+    "Wildlife Specials","Anthony Bourdain: Parts Unknown","Chef's Table","Jiro Dreams of Sushi","Citizenfour","Chernobyl",
+    "When They See Us","The Cove","Free Solo","March of the Penguins"
+  ],
+  kult: [
+    "Pulp Fiction","Baby Driver","Sicario","Collateral","Drive","Mad Max: Fury Road","Blade Runner","Inception",
+    "The Dark Knight","Fight Club","Interstellar","The Matrix","Se7en","No Country for Old Men","Oldboy","Memento",
+    "Inglourious Basterds","The Revenant","The Departed","Shutter Island","Heat","The Bourne Identity","John Wick",
+    "John Wick: Chapter 2","John Wick: Chapter 3","The Prestige","The Social Network","La La Land","Joker","The Irishman"
+  ]
+};
+
+/* add many more realistic hits to each pool (keeps file big) */
+(function expandBigPool(){
+  const extras = [
+    "Joker","La La Land","Whiplash","Spotlight","Moonlight","Parasite","The Social Network","Good Will Hunting",
+    "12 Years a Slave","The King's Speech","Manchester by the Sea","Roma","Her","The Grand Budapest Hotel",
+    "Requiem for a Dream","The Prestige","Donnie Darko","Alien","Aliens","The Shining","The Terminator",
+    "Terminator 2","Mad Max 2: The Road Warrior","The Hobbit: An Unexpected Journey","Harry Potter and the Philosopher's Stone",
+    "Harry Potter and the Chamber of Secrets","Harry Potter and the Prisoner of Azkaban","The Lord of the Rings: The Two Towers",
+    "The Lord of the Rings: The Return of the King","Star Wars: A New Hope","Star Wars: The Empire Strikes Back",
+    "Rogue One","Guardians of the Galaxy","The Avengers","Avengers: Endgame","Black Panther","Thor: Ragnarok",
+    "Wonder Woman","Logan","Deadpool","The Hunger Games","The Martian","Gravity","Arrival","Blade Runner 2049",
+    "Get Out","Us","Midsommar","The Witch","The Lighthouse","Portrait of a Lady on Fire","Brooklyn","Lady Bird",
+    "Call Me by Your Name","The Favourite","Three Billboards Outside Ebbing, Missouri","The Handmaid's Tale",
+    "Black Mirror","Westworld","Stranger Things","Narcos: Mexico","Elite","Money Heist","Lupin","The Queen's Gambit",
+    "You","The Expanse","The Haunting of Hill House","House of Cards","The Boys","Daredevil","Jessica Jones","Watchmen",
+    "The Man in the High Castle","Band of Brothers","The Pacific","When They See Us","Happy Valley","Top of the Lake",
+    "Miss Fisher's Murder Mysteries","Inspector Morse","Poirot","Midsomer Murders","Agatha Christie's Marple"
+  ];
+  let idx = 0;
+  const keys = Object.keys(pools);
+  extras.forEach(t=>{
+    pools[keys[idx % keys.length]].push(t);
+    idx++;
+  });
+})();
+
+/* poster cache */
+let posterCache = {}; // title -> {poster,desc,year,duration}
+
+/* ================= HELPERS ================= */
+function roundUpTo10(n){ return Math.ceil(n/10)*10; }
+function minutesToHHMM(mins){ mins = mins % (24*60); const h = Math.floor(mins/60); const m = mins%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
+function todayKey(){ const d = new Date(); return scheduleKeyPrefix + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate(); }
+function chooseNoRepeat(pool, used){ const c = pool.filter(t => (used[t]||0) < usedLimitPerDay); if(c.length===0) return pool[Math.floor(Math.random()*pool.length)]; return c[Math.floor(Math.random()*c.length)]; }
+
+/* ================= TMDB FUNCTIONS (poster & durations) ================= */
+async function fetchTMDBInfo(title){
+  try{
+    const key = localStorage.getItem(tmdbStorageKey) || tmdbPresetKey || '';
+    if(!key) return null;
+    const q = encodeURIComponent(title);
+    const s = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${key}&language=de-DE&query=${q}&page=1&include_adult=false`);
+    if(!s.ok) return null;
+    const data = await s.json();
+    if(!data.results || data.results.length===0) return null;
+    let item = data.results.find(r => ((r.title && r.title.toLowerCase() === title.toLowerCase()) || (r.name && r.name.toLowerCase() === title.toLowerCase()))) || data.results.find(r=>r.media_type==='movie' || r.media_type==='tv') || data.results[0];
+    if(!item) return null;
+    const posterPath = item.poster_path || item.backdrop_path || null;
+    const posterUrl = posterPath ? 'https://image.tmdb.org/t/p/w500' + posterPath : null;
+    const desc = item.overview || '';
+    const year = item.release_date || item.first_air_date || '';
+    let duration = null;
+    // try movie details
+    if(item.media_type==='movie' || item.title){
+      const m = await fetch(`https://api.themoviedb.org/3/movie/${item.id}?api_key=${localStorage.getItem(tmdbStorageKey)||tmdbPresetKey}&language=de-DE`);
+      if(m.ok){ const md = await m.json(); duration = md.runtime || null; }
+    }
+    if((item.media_type==='tv' || item.name) && !duration){
+      const t = await fetch(`https://api.themoviedb.org/3/tv/${item.id}?api_key=${localStorage.getItem(tmdbStorageKey)||tmdbPresetKey}&language=de-DE`);
+      if(t.ok){ const td = await t.json(); if(td.episode_run_time && td.episode_run_time.length>0) duration = td.episode_run_time[0]; }
+    }
+    if(!duration){
+      // heuristic fallback
+      const low = title.toLowerCase();
+      if(pools.comedy.some(x => x.toLowerCase()===low) || low.includes('s01') || low.includes('season')) duration = 25;
+      else if(pools.doku.some(x => x.toLowerCase()===low)) duration = 50;
+      else duration = 110;
+    }
+    const info = {poster:posterUrl, desc, year, duration};
+    posterCache[title] = info;
+    return info;
+  }catch(e){
+    console.warn('TMDB fetch failed for', title, e);
+    return null;
+  }
+}
+
+/* ================= JUSTWATCH PROXY CHECK ================= */
+/* The app will call your Vercel proxy (if set in the UI) at runtime to check per-title availability in DE.
+   Proxy endpoint expected: GET /api/justwatch?title=...  -> returns JSON {title: "...", offers: [{provider_id, provider_name, url}, ...]}
+   If proxyUrl is empty, the app runs in offline fallback mode (no availability checks). */
+
+async function checkAvailabilityViaProxy(title){
+  const proxy = localStorage.getItem(proxyStorageKey) || '';
+  if(!proxy) return null;
+  try{
+    const url = proxy + '?title=' + encodeURIComponent(title);
+    const r = await fetch(url);
+    if(!r.ok) return null;
+    const data = await r.json();
+    return data; // expected structured info
+  }catch(e){
+    console.warn('Proxy check failed', e);
+    return null;
+  }
+}
+
+/* ================= SCHEDULE BUILD (24h, dynamic durations) ================= */
+async function buildSchedule24h(){
+  const key = todayKey();
+  const saved = localStorage.getItem(key);
+  if(saved) try { return JSON.parse(saved); } catch(e){ /* rebuild */ }
+
+  // schedule object with rows per sender
+  const schedule = {rows:{drama:[],klassiker:[],comedy:[],doku:[],kult:[],special:[]}, ticks:[]};
+  const used = {};
+
+  // special pool per weekday
+  const wd = new Date().getDay();
+  const specialTheme = (function(){
+    const map = {
+      1: {name:'Murder Monday', samples:['Zodiac','Se7en','True Detective','Prisoners','Gone Girl','Mindhunter']},
+      2: {name:'Diesel Dienstag', samples:['Mad Max: Fury Road','Extraction','Crank','Fast & Furious','John Wick','The Raid']},
+      3: {name:'Mafia Mittwoch', samples:['Goodfellas','Casino','The Godfather','Donnie Brasco','The Irishman','Gomorrah']},
+      4: {name:'Doofer Donnerstag', samples:['The Naked Gun','This Is the End','Life of Brian','Superbad','Anchorman','The Other Guys']},
+      5: {name:'Fantasy Friday', samples:['The Lord of the Rings: The Fellowship of the Ring','Harry Potter and the Philosopher\'s Stone','The Witcher','Stardust','Pan\'s Labyrinth']},
+      6: {name:'Sendungs Samstag', samples:['Das Boot','The Sopranos','South Park','BoJack Horseman','Futurama']},
+      0: {name:'Super Sonntag', samples:['James Bond Marathon','Mission: Impossible Marathon','Star Wars Marathon','The Hobbit Trilogy','Lord of the Rings Marathon']}
+    };
+    return map[wd] || map[1];
+  })();
+  const specialPool = Array.from({length:600}, (_,i) => specialTheme.samples[i % specialTheme.samples.length]);
+
+  // helper to fill a row from minute START to END
+  async function fillRow(pool, placeBlacklist=false){
+    const row = [];
+    let tMin = 0; // start at 00:00 for 24h
+    let blacklistPlaced = false;
+
+    while(tMin < END_MIN - 5){
+      // place blacklist block at fixed 20:00 if required
+      if(placeBlacklist && !blacklistPlaced && tMin >= BLACKLIST_START_MIN){
+        const bl = 'The Blacklist';
+        const info = posterCache[bl] || await fetchTMDBInfo(bl);
+        const ep = info && info.duration ? info.duration : 45;
+        const dur = roundUpTo10(ep);
+        for(let b=0;b<3 && tMin < END_MIN; b++){
+          if(tMin + dur > END_MIN) break;
+          row.push({title:bl, start:tMin, duration:dur, end:tMin+dur});
+          used[bl] = (used[bl]||0) + 1;
+          tMin += dur;
+        }
+        blacklistPlaced = true;
+        continue;
+      }
+
+      const title = chooseNoRepeat(pool, used);
+      let info = posterCache[title];
+      if(!info) info = await fetchTMDBInfo(title);
+      let dur = info && info.duration ? info.duration : (pools.comedy.includes(title) ? 25 : (pools.doku.includes(title) ? 50 : 110));
+      dur = Math.max(8, Math.min(360, Math.round(dur)));
+      const durR = roundUpTo10(dur);
+
+      // if doesn't fit to END, try shorter alternatives a few times
+      if(tMin + durR > END_MIN){
+        let placed = false;
+        for(let tryi=0; tryi<4; tryi++){
+          const alt = chooseNoRepeat(pool, used);
+          if(alt === title) continue;
+          let ainfo = posterCache[alt] || await fetchTMDBInfo(alt);
+          let adur = ainfo && ainfo.duration ? ainfo.duration : 45;
+          adur = Math.max(8, Math.min(360, Math.round(adur)));
+          const adurR = roundUpTo10(adur);
+          if(tMin + adurR <= END_MIN){
+            row.push({title:alt, start:tMin, duration:adurR, end:tMin+adurR});
+            used[alt] = (used[alt]||0) + 1;
+            tMin += adurR;
+            placed = true;
+            break;
+          }
+        }
+        if(!placed) break;
+      } else {
+        row.push({title, start:tMin, duration:durR, end:tMin+durR});
+        used[title] = (used[title]||0) + 1;
+        tMin += durR;
+      }
+    }
+    return row;
+  }
+
+  // build rows
+  schedule.rows.drama = await fillRow(pools.drama, true);
+  schedule.rows.klassiker = await fillRow(pools.klassiker, false);
+  schedule.rows.comedy = await fillRow(pools.comedy, false);
+  schedule.rows.doku = await fillRow(pools.doku, false);
+  schedule.rows.kult = await fillRow(pools.kult, false);
+  schedule.rows.special = await fillRow(specialPool, false);
+
+  // ticks every 1 hour for timeline
+  const ticks = [];
+  for(let m=0;m<=24*60;m+=60) ticks.push(minutesToHHMM(m));
+  schedule.ticks = ticks;
+
+  localStorage.setItem(key, JSON.stringify(schedule));
+  return schedule;
+}
+
+/* ================= RENDERING UI ================= */
+const timelineEl = document.getElementById('timeline');
+const rowsEl = document.getElementById('rows');
+const modal = document.getElementById('modal');
+const modalPoster = document.getElementById('modalPoster');
+const modalTitle = document.getElementById('modalTitle');
+const modalMeta = document.getElementById('modalMeta');
+const modalDesc = document.getElementById('modalDesc');
+const modalActions = document.getElementById('modalActions');
+
+function providerHint(title){
+  const low = title.toLowerCase();
+  if(['bojack','das boot','futurama','rick and morty','witcher','lord of the rings','better call saul','ozark','breaking bad','narcos'].some(k=>low.includes(k))) return 'Netflix DE';
+  if(['family guy','south park','pulp','baby','scarface','goodfellas','der pate','heat','john wick','james bond','inception'].some(k=>low.includes(k))) return 'Prime / WOW';
+  if(['terra x','die deutschen','ard','zdf','arte','making a murderer','the last dance','planet earth'].some(k=>low.includes(k))) return 'ARD / ZDF / ARTE';
+  if(low.includes('blacklist') || low.includes('sopranos')) return 'Sky / Prime (prüfen)';
+  return 'Anbieter prüfen';
+}
+
+function renderTimeline(ticks){
+  timelineEl.innerHTML = '';
+  ticks.forEach(t=>{
+    const d = document.createElement('div'); d.className='timecell'; d.textContent = t; timelineEl.appendChild(d);
+  });
+}
+
+function renderRows(schedule){
+  rowsEl.innerHTML = '';
+  const mapping = [
+    {key:'drama', name:'Drama'},
+    {key:'klassiker', name:'Kino Klassiker'},
+    {key:'comedy', name:'Comedy & Animation'},
+    {key:'doku', name:'Doku & Geschichte'},
+    {key:'kult', name:'Sky/Prime Kult-Hits'},
+    {key:'special', name:'Special — ' + (new Date().getDay() && '' )} // label is in header below
+  ];
+
+  // create header label for special
+  mapping[5].name = 'Special — ' + (function(){
+    const map = {1:'Murder Monday',2:'Diesel Dienstag',3:'Mafia Mittwoch',4:'Doofer Donnerstag',5:'Fantasy Friday',6:'Sendungs Samstag',0:'Super Sonntag'};
+    return map[new Date().getDay()];
+  })();
+
+  mapping.forEach(rowInfo=>{
+    const wrap = document.createElement('div'); wrap.className='row';
+    const header = document.createElement('div'); header.className='row-header';
+    const title = document.createElement('div'); title.className='row-title'; title.textContent = rowInfo.name;
+    header.appendChild(title); wrap.appendChild(header);
+    const sc = document.createElement('div'); sc.className='row-scroll';
+    const items = schedule.rows[rowInfo.key] || [];
+    items.forEach(it=>{
+      const card = document.createElement('div'); card.className='card';
+      const poster = document.createElement('div'); poster.className='poster';
+      const pc = posterCache[it.title] && posterCache[it.title].poster ? posterCache[it.title].poster : '';
+      if(pc) poster.style.backgroundImage = `url(${pc})`; else poster.textContent = '';
+      const meta = document.createElement('div'); meta.className='meta';
+      const tdiv = document.createElement('div');
+      tdiv.innerHTML = `<div class="titleSmall">${it.title}</div><div class="provider">${providerHint(it.title)}</div><div style="font-size:12px;color:var(--muted)">${minutesToHHMM(it.start)} — ${minutesToHHMM(it.end)} (${it.duration} min)</div>`;
+      meta.appendChild(tdiv);
+      card.appendChild(poster);
+      card.appendChild(meta);
+      card.onclick = ()=> openModal(it.title);
+      sc.appendChild(card);
+    });
+    wrap.appendChild(sc);
+    rowsEl.appendChild(wrap);
+  });
+}
+
+/* ================= MODAL ================= */
+async function openModal(title){
+  modal.classList.add('open');
+  modalTitle.textContent = title;
+  modalMeta.textContent = providerHint(title);
+  modalDesc.textContent = 'Lade Informationen ...';
+  modalPoster.style.backgroundImage = '';
+  modalActions.innerHTML = '';
+
+  let info = posterCache[title];
+  if(!info) info = await fetchTMDBInfo(title);
+  if(info){
+    if(info.poster) modalPoster.style.backgroundImage = `url(${info.poster})`;
+    modalDesc.textContent = info.desc || 'Keine Beschreibung verfügbar.';
+    modalMeta.textContent = (info.year ? (info.year.split('-')[0] + ' · ') : '') + providerHint(title);
+  } else {
+    modalDesc.textContent = 'Keine Metadaten gefunden (TMDB-Key fehlt oder kein Treffer).';
+  }
+
+  // availability via proxy (if set)
+  const avail = await checkAvailabilityViaProxy(title);
+  if(avail && avail.offers && avail.offers.length>0){
+    const line = document.createElement('div'); line.style.fontSize='13px'; line.style.marginTop='8px';
+    line.textContent = 'Angebote: ' + avail.offers.map(o=>o.provider_name).join(', ');
+    modalActions.appendChild(line);
+    // provider quick links
+    avail.offers.slice(0,6).forEach(o=>{
+      const b = document.createElement('button'); b.className='btn'; b.textContent = o.provider_name;
+      b.onclick = ()=> window.open(o.url || '#','_blank');
+      modalActions.appendChild(b);
+    });
+  } else {
+    // show generic search buttons
+    const btns = [
+      {name:'Netflix DE',url:providers.netflix(title)},
+      {name:'Prime DE', url:providers.prime(title)},
+      {name:'WOW / Sky', url:providers.sky(title)},
+      {name:'ARD', url:providers.ard(title)},
+      {name:'ZDF', url:providers.zdf(title)},
+      {name:'ARTE', url:providers.arte(title)}
+    ];
+    btns.forEach(b=>{
+      const el = document.createElement('button'); el.className='btn'; el.textContent = b.name;
+      el.onclick = (e)=>{ e.stopPropagation(); window.open(b.url,'_blank'); };
+      modalActions.appendChild(el);
+    });
+  }
+}
+document.getElementById('modalClose').onclick = ()=> modal.classList.remove('open');
+
+/* ================= SETTINGS & CONTROLS ================= */
+document.getElementById('settingsBtn').onclick = ()=> {
+  document.getElementById('tmdbKey').value = localStorage.getItem(tmdbStorageKey) || tmdbPresetKey || '';
+  document.getElementById('proxyUrl').value = localStorage.getItem(proxyStorageKey) || '';
+  // open simple settings modal by focusing inputs (no extra modal)
+  document.getElementById('tmdbKey').focus();
+};
+document.getElementById('tmdbKey').addEventListener('change', (e)=> {
+  const v = e.target.value.trim(); if(v) localStorage.setItem(tmdbStorageKey, v); else localStorage.removeItem(tmdbStorageKey);
+  alert('TMDB Key gespeichert.');
+});
+document.getElementById('proxyUrl').addEventListener('change', (e)=> {
+  const v = e.target.value.trim(); if(v) localStorage.setItem(proxyStorageKey, v); else localStorage.removeItem(proxyStorageKey);
+  alert('Proxy-URL gespeichert.');
+});
+
+document.getElementById('regen').onclick = async ()=>{
+  localStorage.removeItem(todayKey());
+  await init();
+};
+document.getElementById('export').onclick = ()=> {
+  const blob = new Blob([document.documentElement.outerHTML], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'mein_streaming_tv_v4.html'; a.click(); URL.revokeObjectURL(url);
+};
+
+/* ================= AUTOMATIC DAILY REGEN (midnight) ================= */
+// If the date changes (local midnight) create new schedule automatically
+function scheduleDailyAuto(){
+  setInterval(()=> {
+    const now = new Date();
+    if(now.getHours()===0 && now.getMinutes()===0){
+      // new day — remove cached schedule and regenerate
+      localStorage.removeItem(todayKey());
+      init();
+    }
+  }, 60*1000); // check each minute
+}
+
+/* ================= INIT ================= */
+async function init(){
+  try{
+    posterCache = posterCache || {};
+    // if tmdb key preset, save
+    const preset = document.getElementById('tmdbKey').value.trim();
+    if(preset) localStorage.setItem(tmdbStorageKey,preset);
+    // schedule build
+    const schedule = await buildSchedule24h();
+    renderTimeline(schedule.ticks);
+    renderRows(schedule);
+    // async prefetch posters (best-effort)
+    const all = new Set();
+    Object.values(schedule.rows).forEach(arr => arr.forEach(it => all.add(it.title)));
+    all.forEach(t => { if(!posterCache[t]) fetchTMDBInfo(t).catch(()=>null); });
+    scheduleDailyAuto();
+  }catch(e){
+    console.error('Init error', e);
+    alert('Fehler beim Erstellen des Programms. Wenn du lokal arbeitest, lade die Datei via GitHub Pages (empfohlen) oder nutze einen lokalen http-server.');
+  }
+}
+init();
+
+/* small helpers for keys used above */
+function todayKey(){ const d = new Date(); return scheduleKeyPrefix + d.getFullYear() + '_' + (d.getMonth()+1) + '_' + d.getDate(); }
+
+</script>
+</body>
+</html>
