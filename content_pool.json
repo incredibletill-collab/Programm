@@ -1,0 +1,62 @@
+{
+  "drama": [
+    "The Blacklist",
+    "Das Boot",
+    "Breaking Bad",
+    "Better Call Saul",
+    "Ozark",
+    "Mindhunter",
+    "Narcos",
+    "Peaky Blinders",
+    "The Crown",
+    "Fargo"
+  ],
+  "klassiker": [
+    "Der Pate",
+    "Der Pate II",
+    "Scarface",
+    "Pulp Fiction",
+    "Heat",
+    "Goodfellas",
+    "Taxi Driver",
+    "Casablanca",
+    "Apocalypse Now",
+    "Chinatown"
+  ],
+  "comedy": [
+    "Family Guy",
+    "South Park",
+    "Futurama",
+    "BoJack Horseman",
+    "How I Met Your Mother",
+    "The Office (US)",
+    "Arrested Development",
+    "Brooklyn Nine-Nine",
+    "Parks and Recreation",
+    "Seinfeld"
+  ],
+  "doku": [
+    "Terra X",
+    "Planet Earth",
+    "Blue Planet",
+    "Our Planet",
+    "ZDF History",
+    "Making a Murderer",
+    "The Last Dance",
+    "Cosmos",
+    "Inside Job",
+    "Chef's Table"
+  ],
+  "kult": [
+    "Pulp Fiction",
+    "Baby Driver",
+    "Sicario",
+    "Drive",
+    "Mad Max: Fury Road",
+    "Blade Runner",
+    "Inception",
+    "The Dark Knight",
+    "Fight Club",
+    "Interstellar"
+  ]
+}
